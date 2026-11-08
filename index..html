@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Сверка выписки и учёта</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1b1f24;--muted:#5f6b7a;--line:#dfe3e8;--accent:#1f4e78;--accent-t:#fff;--ok:#1e7a46;--warn:#9a6700;--bad:#b42318;--okbg:#e6f4ea;--warnbg:#fff4d6;--badbg:#fde8e6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14181d;--card:#1d232a;--text:#e8ebef;--muted:#9aa6b4;--line:#2e3742;--accent:#6aa9e0;--accent-t:#0e1a26;--ok:#6fd39a;--warn:#f0c15a;--bad:#ff8f84;--okbg:#18352500;--warnbg:#3a3015;--badbg:#3d1b18;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14181d;--card:#1d232a;--text:#e8ebef;--muted:#9aa6b4;--line:#2e3742;--accent:#6aa9e0;--accent-t:#0e1a26;--ok:#6fd39a;--warn:#f0c15a;--bad:#ff8f84;--okbg:#183525;--warnbg:#3a3015;--badbg:#3d1b18;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:22px;margin:0 0 4px}
+p.sub{margin:0 0 18px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h2{font-size:15px;margin:0 0 8px}
+textarea{width:100%;height:150px;resize:vertical;font:12.5px/1.4 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+button,.file{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px 12px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-t);border-color:var(--accent);font-weight:600}
+.file input{display:none}
+input[type=number]{width:64px;font:inherit;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+.hint{color:var(--muted);font-size:13px}
+.err{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--badbg);color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:18px 0 6px}
+.stat{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
+.stat b{display:block;font-size:22px}
+.stat.ok b{color:var(--ok)}.stat.warn b{color:var(--warn)}.stat.bad b{color:var(--bad)}
+section.res{margin-top:18px}
+section.res h3{font-size:16px;margin:0 0 6px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:520px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13.5px}
+th{color:var(--muted);font-weight:600;white-space:nowrap}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.empty{padding:12px;color:var(--muted)}
+.note{margin-top:22px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Сверка банковской выписки и учёта</h1>
+<p class="sub">Вставьте или загрузите два CSV-файла: выписку банка и записи из учётной системы (например, 1C). Инструмент найдёт совпадения и расхождения. Данные обрабатываются только в вашем браузере и никуда не отправляются.</p>
+
+<div class="grid">
+<div class="card"><h2>1. Банковская выписка</h2>
+<textarea id="bank" spellcheck="false" placeholder="Дата;Описание;Сумма"></textarea>
+<div class="row"><label class="file">Загрузить CSV<input type="file" accept=".csv,.txt" data-target="bank"></label></div></div>
+<div class="card"><h2>2. Учёт (журнал операций)</h2>
+<textarea id="ledger" spellcheck="false" placeholder="Дата;Описание;Сумма"></textarea>
+<div class="row"><label class="file">Загрузить CSV<input type="file" accept=".csv,.txt" data-target="ledger"></label></div></div>
+</div>
+
+<div class="row">
+<label>Допуск по дате, дней: <input type="number" id="tol" value="3" min="0" max="30"></label>
+<button class="primary" id="run">Сверить</button>
+<button id="sample">Пример данных</button>
+</div>
+<p class="hint">Нужны столбцы: дата, сумма (или дебет и кредит), по желанию описание. Заголовки на русском или английском. Разделитель: запятая, точка с запятой или табуляция.</p>
+<div id="err"></div>
+<div id="out"></div>
+<p class="note">Результат — рабочая подсказка для бухгалтера, а не заключение аудитора. Каждое расхождение нужно проверить по первичным документам.</p>
+</div>
+
+<script>
+(function(){
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function parseCSV(text){
+  text=text.replace(/^\uFEFF/,'').trim(); if(!text) return [];
+  var first=text.split(/\r?\n/)[0];
+  var delim=[';','\t',','].map(function(d){return [d,first.split(d).length]}).sort(function(a,b){return b[1]-a[1]})[0][0];
+  var rows=[],row=[],cur='',q=false;
+  for(var i=0;i<text.length;i++){
+    var c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++} else q=false } else cur+=c }
+    else if(c==='"') q=true;
+    else if(c===delim){row.push(cur);cur=''}
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n')i++; row.push(cur);rows.push(row);row=[];cur='' }
+    else cur+=c;
+  }
+  row.push(cur); rows.push(row);
+  return rows.filter(function(r){return r.some(function(x){return x.trim()!==''})});
+}
+function parseDate(s){
+  s=String(s||'').trim(); var m;
+  if((m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/))) return Date.UTC(+m[1],+m[2]-1,+m[3])/864e5;
+  if((m=s.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/))){var y=+m[3]; if(y<100)y+=2000; return Date.UTC(y,+m[2]-1,+m[1])/864e5}
+  return NaN;
+}
+function parseNum(s){
+  s=String(s==null?'':s).trim(); if(!s) return NaN;
+  var neg=/^\(.*\)$/.test(s)||/^-/.test(s)||/-$/.test(s);
+  s=s.replace(/[^\d,.\u00a0 ]/g,'').replace(/[\u00a0 ]/g,'');
+  if(!s) return NaN;
+  var lc=s.lastIndexOf(','),ld=s.lastIndexOf('.');
+  if(lc>-1&&ld>-1){ if(lc>ld) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,'') }
+  else if(lc>-1){ s=/,\d{1,2}$/.test(s)?s.replace(',','.'):s.replace(/,/g,'') }
+  var v=parseFloat(s); if(isNaN(v)) return NaN;
+  return neg?-Math.abs(v):v;
+}
+function toRecords(text,label){
+  var rows=parseCSV(text);
+  if(rows.length<2) throw new Error(label+': нет данных (нужна строка заголовков и хотя бы одна операция).');
+  var h=rows[0].map(function(x){return x.trim().toLowerCase()});
+  function find(re){for(var i=0;i<h.length;i++){if(re.test(h[i]))return i}return -1}
+  var di=find(/date|дата/), ai=find(/^(amount|amt|сумма)|amount|сумма/), de=find(/debit|дебет/), cr=find(/credit|кредит/), ni=find(/desc|detail|narr|memo|назнач|описан|контрагент|name/);
+  if(di<0||(ai<0&&de<0&&cr<0)) throw new Error(label+': не найдены столбцы «дата» и «сумма» (или «дебет»/«кредит»). Проверьте заголовки.');
+  var recs=[],skipped=0;
+  for(var r=1;r<rows.length;r++){
+    var row=rows[r], d=parseDate(row[di]), a;
+    if(ai>=0) a=parseNum(row[ai]);
+    else { var dv=parseNum(row[de]), cv=parseNum(row[cr]); a=(isNaN(cv)?0:cv)-(isNaN(dv)?0:dv); if(isNaN(dv)&&isNaN(cv)) a=NaN }
+    if(isNaN(d)||isNaN(a)){skipped++;continue}
+    recs.push({date:d,desc:ni>=0?(row[ni]||'').trim():'',amt:a,line:r+1});
+  }
+  if(!recs.length) throw new Error(label+': не удалось прочитать ни одной строки. Проверьте формат дат и сумм.');
+  return {recs:recs,skipped:skipped};
+}
+function reconcile(bank,ledger,tol){
+  var used={},matched=[],pending=[],possible=[],bankOnly=[];
+  bank.forEach(function(b){
+    var best=-1,bd=1e9;
+    ledger.forEach(function(l,i){
+      if(used[i])return;
+      if(Math.abs(b.amt-l.amt)<0.005){var d=Math.abs(b.date-l.date); if(d<=tol&&d<bd){bd=d;best=i}}
+    });
+    if(best>=0){used[best]=1;matched.push({b:b,l:ledger[best],d:bd})} else pending.push(b);
+  });
+  pending.forEach(function(b){
+    var best=-1,bd=1e9;
+    ledger.forEach(function(l,i){
+      if(used[i])return;
+      if(Math.abs(b.amt-l.amt)<0.005){var d=Math.abs(b.date-l.date); if(d<bd){bd=d;best=i}}
+    });
+    if(best>=0){used[best]=1;possible.push({b:b,l:ledger[best],d:bd})} else bankOnly.push(b);
+  });
+  var ledgerOnly=ledger.filter(function(l,i){return !used[i]});
+  return {matched:matched,possible:possible,bankOnly:bankOnly,ledgerOnly:ledgerOnly};
+}
+function fd(n){return new Date(n*864e5).toISOString().slice(0,10)}
+function fm(n){return n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function sum(a){return a.reduce(function(s,x){return s+x.amt},0)}
+function table(head,rows){
+  if(!rows.length) return '<div class="empty">Нет строк.</div>';
+  return '<div class="scroll"><table><thead><tr>'+head.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+}
+function single(x){return '<tr><td>'+fd(x.date)+'</td><td>'+esc(x.desc)+'</td><td class="n">'+fm(x.amt)+'</td><td class="n">'+x.line+'</td></tr>'}
+function pair(p){return '<tr><td>'+fd(p.b.date)+'</td><td>'+fd(p.l.date)+'</td><td>'+esc(p.b.desc)+'</td><td>'+esc(p.l.desc)+'</td><td class="n">'+fm(p.b.amt)+'</td><td class="n">'+p.d+'</td></tr>'}
+function run(){
+  $('err').innerHTML=''; $('out').innerHTML='';
+  try{
+    var B=toRecords($('bank').value,'Выписка банка'), L=toRecords($('ledger').value,'Учёт');
+    var tol=Math.max(0,parseInt($('tol').value,10)||0);
+    var R=reconcile(B.recs,L.recs,tol);
+    var diff=sum(B.recs)-sum(L.recs);
+    var h='<div class="stats">'+
+      '<div class="stat ok"><b>'+R.matched.length+'</b>совпало</div>'+
+      '<div class="stat warn"><b>'+R.possible.length+'</b>сумма совпала, дата далеко</div>'+
+      '<div class="stat bad"><b>'+R.bankOnly.length+'</b>только в банке</div>'+
+      '<div class="stat bad"><b>'+R.ledgerOnly.length+'</b>только в учёте</div>'+
+      '<div class="stat"><b>'+fm(diff)+'</b>разница итогов (банк − учёт)</div></div>';
+    if(B.skipped||L.skipped) h+='<p class="hint">Пропущено нечитаемых строк: выписка — '+B.skipped+', учёт — '+L.skipped+'.</p>';
+    h+='<section class="res"><h3>Только в банке (не отражено в учёте)</h3>'+table(['Дата','Описание','Сумма','Строка'],R.bankOnly.map(single))+'</section>';
+    h+='<section class="res"><h3>Только в учёте (нет в выписке)</h3>'+table(['Дата','Описание','Сумма','Строка'],R.ledgerOnly.map(single))+'</section>';
+    h+='<section class="res"><h3>Сумма совпала, но дата вне допуска ('+tol+' дн.)</h3>'+table(['Дата банк','Дата учёт','Описание банк','Описание учёт','Сумма','Дней'],R.possible.map(pair))+'</section>';
+    h+='<section class="res"><h3>Совпавшие операции</h3>'+table(['Дата банк','Дата учёт','Описание банк','Описание учёт','Сумма','Дней'],R.matched.map(pair))+'</section>';
+    $('out').innerHTML=h;
+  }catch(e){ $('err').innerHTML='<div class="err">'+esc(e.message)+'</div>' }
+}
+var SB='Дата;Описание;Сумма\n02.10.2026;Оплата поставщику ТОО Альфа;-150000,00\n03.10.2026;Поступление от ТОО Бета;320000,00\n05.10.2026;Комиссия банка;-2500,00\n07.10.2026;Аренда офиса;-180000,00\n10.10.2026;Поступление от ИП Ермек;95000,00\n14.10.2026;Налоговый платёж;-64000,00\n20.10.2026;Неопознанный платёж;-12300,00';
+var SL='Дата;Описание;Сумма\n01.10.2026;Оплата ТОО Альфа по счёту 41;-150000,00\n03.10.2026;Оплата от ТОО Бета, акт 17;320000,00\n07.10.2026;Аренда за октябрь;-180000,00\n12.10.2026;Поступление ИП Ермек, счёт 22;95000,00\n14.10.2026;Налоги за сентябрь;-64000,00\n25.10.2026;Покупка канцтоваров;-8700,00';
+$('sample').onclick=function(){$('bank').value=SB;$('ledger').value=SL;run()};
+$('run').onclick=run;
+Array.prototype.forEach.call(document.querySelectorAll('input[type=file]'),function(inp){
+  inp.onchange=function(){
+    var f=inp.files[0]; if(!f)return;
+    var r=new FileReader(); r.onload=function(){$(inp.getAttribute('data-target')).value=String(r.result)}; r.readAsText(f);
+  };
+});
+})();
+</script>
+</body>
+</html>
