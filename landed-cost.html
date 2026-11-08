@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Landed Cost &amp; Incoterms</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1b1f24;--muted:#5f6b7a;--line:#dfe3e8;--accent:#1f4e78;--accent-t:#fff;--hi:#e8f0f8;--ok:#1e7a46;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14181d;--card:#1d232a;--text:#e8ebef;--muted:#9aa6b4;--line:#2e3742;--accent:#6aa9e0;--accent-t:#0e1a26;--hi:#22303d;--ok:#6fd39a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14181d;--card:#1d232a;--text:#e8ebef;--muted:#9aa6b4;--line:#2e3742;--accent:#6aa9e0;--accent-t:#0e1a26;--hi:#22303d;--ok:#6fd39a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 48px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:17px;margin:28px 0 8px}
+p.sub{margin:0 0 16px;color:var(--muted)}
+button{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);padding:6px 12px;cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.f{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.f span{font-size:13px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input[type=number],input[type=text]{width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+.hint{color:var(--muted);font-size:12.5px;margin:4px 0 0}
+.rows div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line)}
+.rows div:last-child{border-bottom:0}
+.rows .tot{font-weight:700;background:var(--hi);padding:9px 8px;border-radius:8px;margin-top:6px;border:0}
+.rows b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td.code{font-weight:700;white-space:nowrap}
+.note{margin-top:18px;font-size:13px;color:var(--muted)}
+.note ul{margin:6px 0 0 18px;padding:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="top"><div><h1 data-i="title"></h1><p class="sub" data-i="sub"></p></div><button id="lang">EN</button></div>
+
+<div class="grid">
+<div class="card">
+<div class="two">
+<label class="f"><span data-i="cur"></span><input type="text" id="cur" value="AED"></label>
+<label class="f"><span data-i="qty"></span><input type="number" id="qty" value="1" min="1" step="1"></label>
+</div>
+<label class="f"><span data-i="goods"></span><input type="number" id="goods" min="0" step="any"></label>
+<div class="two">
+<label class="f"><span data-i="freight"></span><input type="number" id="freight" min="0" step="any"></label>
+<label class="f"><span data-i="ins"></span><input type="number" id="ins" min="0" step="any"></label>
+</div>
+<label class="f"><span data-i="other"></span><input type="number" id="other" min="0" step="any"></label>
+<div class="two">
+<label class="f"><span data-i="duty"></span><input type="number" id="duty" value="5" min="0" step="any"></label>
+<label class="f"><span data-i="vat"></span><input type="number" id="vat" value="5" min="0" step="any"></label>
+</div>
+<label class="chk"><input type="checkbox" id="recov"><span data-i="recov"></span></label>
+<p class="hint" data-i="hint"></p>
+</div>
+<div class="card"><div class="rows" id="res"></div></div>
+</div>
+
+<h2 data-i="incoH"></h2>
+<div class="scroll"><table><thead id="ith"></thead><tbody id="itb"></tbody></table></div>
+
+<div class="note"><b data-i="assumeH"></b><ul id="assume"></ul><p data-i="disc"></p></div>
+</div>
+
+<script>
+/*CALC_START*/
+function calc(o){
+  var cif=o.goods+o.freight+o.ins;
+  var duty=cif*o.duty/100;
+  var vatBase=cif+duty;
+  var vat=vatBase*o.vat/100;
+  var landed=o.goods+o.freight+o.ins+duty+o.other+(o.recov?0:vat);
+  var q=o.qty>0?o.qty:1;
+  return {cif:cif,duty:duty,vatBase:vatBase,vat:vat,landed:landed,unit:landed/q,over:o.goods>0?(landed-o.goods)/o.goods*100:0};
+}
+/*CALC_END*/
+(function(){
+var T={
+ru:{title:"Калькулятор стоимости импорта (landed cost)",sub:"Считает полную стоимость груза с доставкой, пошлиной и НДС. Расчёт происходит в браузере, данные никуда не отправляются.",
+cur:"Валюта (подпись)",qty:"Количество единиц",goods:"Стоимость товара",freight:"Фрахт (доставка)",ins:"Страховка",other:"Прочие расходы (порт, склад, транспорт)",duty:"Таможенная пошлина, %",vat:"НДС на импорт, %",
+recov:"НДС к вычету (компания зарегистрирована как плательщик НДС)",hint:"Вводите все суммы в одной валюте. Для большинства товаров в ОАЭ ставка пошлины и НДС равна 5%, но ставка зависит от кода товара (HS), поэтому уточните её у таможни.",
+rCif:"Таможенная стоимость (CIF)",rDuty:"Таможенная пошлина",rBase:"База НДС (CIF + пошлина)",rVat:"НДС при ввозе",rVatNote:"НДС к вычету, в стоимость не входит",rVatIn:"НДС включён в стоимость",rLanded:"Полная стоимость (landed cost)",rUnit:"Стоимость за единицу",rOver:"Надбавка к стоимости товара",
+incoH:"Incoterms 2020: кто за что отвечает",thT:"Термин",thM:"Транспорт",thE:"Экспортное оформление",thF:"Основная перевозка",thI:"Страхование",thP:"Импортное оформление и пошлины",thR:"Переход риска",
+any:"Любой",sea:"Морской и речной",S:"Продавец",B:"Покупатель",none:"Не обязательно",insA:"Продавец (расширенное покрытие)",insC:"Продавец (минимальное покрытие)",
+assumeH:"Допущения расчёта",a1:"Пошлина считается от CIF-стоимости (товар + фрахт + страховка).",a2:"НДС при ввозе считается от CIF-стоимости плюс пошлина.",a3:"Акцизы и специальные сборы не учитываются.",a4:"Прочие расходы добавляются к стоимости без НДС.",
+disc:"Справочный инструмент, не консультация по таможне или налогам. Ставки и правила проверяйте на официальных сайтах таможенных и налоговых органов."},
+en:{title:"Landed Cost Calculator",sub:"Calculates the full cost of imported goods including freight, duty and VAT. It runs in your browser and sends no data anywhere.",
+cur:"Currency (label)",qty:"Number of units",goods:"Goods value",freight:"Freight",ins:"Insurance",other:"Other costs (port, storage, local transport)",duty:"Customs duty, %",vat:"Import VAT, %",
+recov:"VAT is recoverable (company is VAT-registered)",hint:"Enter all amounts in one currency. For most goods in the UAE the duty and VAT rates are 5%, but the rate depends on the HS code, so confirm it with customs.",
+rCif:"Customs value (CIF)",rDuty:"Customs duty",rBase:"VAT base (CIF + duty)",rVat:"Import VAT",rVatNote:"VAT is recoverable and excluded from cost",rVatIn:"VAT included in cost",rLanded:"Landed cost",rUnit:"Cost per unit",rOver:"Uplift over goods value",
+incoH:"Incoterms 2020: who is responsible for what",thT:"Term",thM:"Transport mode",thE:"Export clearance",thF:"Main carriage",thI:"Insurance",thP:"Import clearance and duties",thR:"Risk transfers",
+any:"Any mode",sea:"Sea and inland waterway",S:"Seller",B:"Buyer",none:"Not required",insA:"Seller (broad cover)",insC:"Seller (minimum cover)",
+assumeH:"Calculation assumptions",a1:"Duty is charged on the CIF value (goods + freight + insurance).",a2:"Import VAT is charged on the CIF value plus duty.",a3:"Excise and special fees are not included.",a4:"Other costs are added net of VAT.",
+disc:"Reference tool only, not customs or tax advice. Check rates and rules with the official customs and tax authorities."}
+};
+// code, name ru, mode, export, freight, insurance(0 none,1 broad,2 min), import, risk ru, risk en
+var INC=[
+["EXW","Ex Works","any","B","B",0,"B","На территории продавца","At the seller’s premises"],
+["FCA","Free Carrier","any","S","B",0,"B","При передаче перевозчику покупателя","On handover to the buyer’s carrier"],
+["CPT","Carriage Paid To","any","S","S",0,"B","При передаче первому перевозчику","On handover to the first carrier"],
+["CIP","Carriage and Insurance Paid To","any","S","S",1,"B","При передаче первому перевозчику","On handover to the first carrier"],
+["DAP","Delivered At Place","any","S","S",0,"B","В месте назначения, до выгрузки","At the named destination, ready for unloading"],
+["DPU","Delivered at Place Unloaded","any","S","S",0,"B","В месте назначения, после выгрузки","At the named destination, once unloaded"],
+["DDP","Delivered Duty Paid","any","S","S",0,"S","В месте назначения, до выгрузки","At the named destination, ready for unloading"],
+["FAS","Free Alongside Ship","sea","S","B",0,"B","У борта судна в порту отгрузки","Alongside the ship at the port of shipment"],
+["FOB","Free On Board","sea","S","B",0,"B","На борту судна в порту отгрузки","On board the vessel at the port of shipment"],
+["CFR","Cost and Freight","sea","S","S",0,"B","На борту судна в порту отгрузки","On board the vessel at the port of shipment"],
+["CIF","Cost, Insurance and Freight","sea","S","S",2,"B","На борту судна в порту отгрузки","On board the vessel at the port of shipment"]
+];
+var lang="ru";
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function num(id){var v=parseFloat($(id).value);return isNaN(v)||v<0?0:v}
+function fm(n){return n.toLocaleString(lang==="ru"?"ru-RU":"en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function render(){
+  var t=T[lang], cur=esc($("cur").value.trim());
+  var r=calc({goods:num("goods"),freight:num("freight"),ins:num("ins"),other:num("other"),duty:num("duty"),vat:num("vat"),qty:num("qty")||1,recov:$("recov").checked});
+  function row(l,v,cls){return '<div'+(cls?' class="'+cls+'"':'')+'><span>'+l+'</span><b>'+fm(v)+' '+cur+'</b></div>'}
+  var h=row(t.rCif,r.cif)+row(t.rDuty,r.duty)+row(t.rBase,r.vatBase)+row(($("recov").checked?t.rVatNote:t.rVatIn)+" ("+t.rVat+")",r.vat)+row(t.rLanded,r.landed,"tot")+row(t.rUnit,r.unit);
+  h+='<div><span>'+t.rOver+'</span><b>'+fm(r.over)+' %</b></div>';
+  $("res").innerHTML=h;
+}
+function renderInc(){
+  var t=T[lang];
+  $("ith").innerHTML="<tr>"+["thT","thM","thE","thF","thI","thP","thR"].map(function(k){return "<th>"+t[k]+"</th>"}).join("")+"</tr>";
+  $("itb").innerHTML=INC.map(function(x){
+    var ins=x[5]===1?t.insA:x[5]===2?t.insC:t.none;
+    return "<tr><td class=\"code\">"+x[0]+"<br><span style=\"font-weight:400;color:var(--muted)\">"+esc(x[1])+"</span></td><td>"+t[x[2]]+"</td><td>"+t[x[3]]+"</td><td>"+t[x[4]]+"</td><td>"+ins+"</td><td>"+t[x[6]]+"</td><td>"+esc(lang==="ru"?x[7]:x[8])+"</td></tr>";
+  }).join("");
+}
+function applyLang(){
+  var t=T[lang];
+  document.documentElement.lang=lang;
+  Array.prototype.forEach.call(document.querySelectorAll("[data-i]"),function(el){el.textContent=t[el.getAttribute("data-i")]});
+  $("assume").innerHTML=["a1","a2","a3","a4"].map(function(k){return "<li>"+t[k]+"</li>"}).join("");
+  $("lang").textContent=lang==="ru"?"EN":"RU";
+  document.title=lang==="ru"?"Landed cost и Incoterms":"Landed Cost & Incoterms";
+  render();renderInc();
+}
+Array.prototype.forEach.call(document.querySelectorAll("input"),function(i){i.addEventListener("input",render);i.addEventListener("change",render)});
+$("lang").onclick=function(){lang=lang==="ru"?"en":"ru";applyLang()};
+applyLang();
+})();
+</script>
+</body>
+</html>
